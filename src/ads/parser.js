@@ -26,12 +26,12 @@ export default class AdsParser {
 		if (type === '2.0') {
 			const media = root.querySelector('MediaFile');
 			if (media && media.getAttribute('apiFramework') === 'VPAID') {
-				this._parseVAST(root);
+				this._buildTags(root);
 			} else {
-				this._parseVAST(root);
+				this._buildTags(root);
 			}
 		} else {
-			this._parseVAST(root);
+			this._buildTags(root);
 		}
 	}
 
@@ -39,7 +39,7 @@ export default class AdsParser {
 	//
 	// }
 
-	_parseVAST (root) {
+	_buildTags (root) {
 		const
 			ads = root.getElementsByTagName('Ad'),
 			totalAds = ads.length
@@ -55,12 +55,12 @@ export default class AdsParser {
 				adTag = {
 					id: node.id || i,
 					sequence: node.getAttribute('sequence') || 0,
-					impressions: [],
+					impressions: {},
 					mediaFiles: [],
 					clickTracks: [],
 					trackingEvents: {}
 				},
-				childTag = node.getElementsByTagName('InLine')[0]
+				childTag = node.getElementsByTagName('InLine')[0] || node.getElementsByTagName('Wrapper')[0]
 			;
 
 			// Detect if Inline or Wrapper tags are inside the Ad
@@ -78,40 +78,7 @@ export default class AdsParser {
 				adTag.impressions.push(impression.textContent.trim());
 				this._load(uri);
 			} else {
-
-				const
-					impressions = node.getElementsByTagName('Impression'),
-					//mediaFiles = node.getElementsByTagName('MediaFile'),
-					trackFiles = node.getElementsByTagName('Tracking'),
-					clickTracks = node.getElementsByTagName('ClickTracking')
-				;
-
-				adTag.title = node.getElementsByTagName('AdTitle').length ?
-					node.getElementsByTagName('AdTitle')[0].textContent.trim() : '';
-				adTag.description = node.getElementsByTagName('Description').length ?
-					node.getElementsByTagName('Description')[0].textContent.trim() : '';
-				adTag.clickLink = node.getElementsByTagName('ClickThrough').length ?
-					node.getElementsByTagName('ClickThrough')[0].textContent.trim() : '';
-
-				for (let j = 0, impressionsTotal = impressions.length; j < impressionsTotal; j++) {
-					adTag.impressions.push(impressions[j].textContent.trim());
-				}
-
-				for (let j = 0, clickTracksTotal = clickTracks.length; j < clickTracksTotal; j++) {
-					adTag.clickTracks.push(clickTracks[j].textContent.trim());
-				}
-
-				for (let j = 0, tracksTotal = trackFiles.length; j < tracksTotal; j++) {
-					const
-						trackingEvent = trackFiles[j],
-						event = trackingEvent.getAttribute('event')
-					;
-
-					if (adTag.trackingEvents[event] === undefined) {
-						adTag.trackingEvents[event] = [];
-					}
-					adTag.trackingEvents[event].push(trackingEvent.textContent.trim());
-				}
+				this._buildInLine(childTag, adTag);
 
 				// for (let j = 0, mediaFilesTotal = mediaFiles.length; j < mediaFilesTotal; j++) {
 				// 	const
@@ -140,6 +107,45 @@ export default class AdsParser {
 				// 	}
 				// }
 			}
+		}
+	}
+
+	_buildInLine (node, adTag) {
+		adTag.title = node.getElementsByTagName('AdTitle').length ?
+			node.getElementsByTagName('AdTitle')[0].textContent.trim() : '';
+		adTag.description = node.getElementsByTagName('Description').length ?
+			node.getElementsByTagName('Description')[0].textContent.trim() : '';
+		adTag.clickLink = node.getElementsByTagName('ClickThrough').length ?
+			node.getElementsByTagName('ClickThrough')[0].textContent.trim() : '';
+		adTag.error = node.getElementsByTagName('Error').length ?
+			node.getElementsByTagName('ClickThrough')[0].textContent.trim() : '';
+
+		const
+			impressions = node.getElementsByTagName('Impression'),
+			creatives = node.getElementsByTagName('Creatives'),
+			//mediaFiles = node.getElementsByTagName('MediaFile'),
+			trackFiles = node.getElementsByTagName('Tracking'),
+			clickTracks = node.getElementsByTagName('ClickTracking')
+		;
+
+		for (let j = 0, impressionsTotal = impressions.length; j < impressionsTotal; j++) {
+			adTag.impressions[(impressions[j].id || j)] = impressions[j].textContent.trim();
+		}
+
+		for (let j = 0, clickTracksTotal = clickTracks.length; j < clickTracksTotal; j++) {
+			adTag.clickTracks.push(clickTracks[j].textContent.trim());
+		}
+
+		for (let j = 0, tracksTotal = trackFiles.length; j < tracksTotal; j++) {
+			const
+				trackingEvent = trackFiles[j],
+				event = trackingEvent.getAttribute('event')
+			;
+
+			if (adTag.trackingEvents[event] === undefined) {
+				adTag.trackingEvents[event] = [];
+			}
+			adTag.trackingEvents[event].push(trackingEvent.textContent.trim());
 		}
 	}
 }
