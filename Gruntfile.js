@@ -40,8 +40,12 @@ module.exports = function (grunt) {
 		browserify: {
 			dist: {
 				files: {
-					'dist/ads/ads.js': 'src/ads/ads.js',
-					'dist/ads-vast-vpaid/ads-vast-vpaid.js': 'src/ads-vast-vpaid/ads-vast-vpaid.js',
+					'dist/ads/vpaid-vast.js': [
+						'src/ads/ads.js',
+						'src/ads/vpaid-wrapper.js',
+						'src/ads/parser.js',
+						'src/ads/player.js',
+					],
 					'dist/airplay/airplay.js': 'src/airplay/airplay.js',
 					'dist/chromecast/chromecast.js': ['src/chromecast/chromecast.js', 'src/chromecast/player.js'],
 					'dist/context-menu/context-menu.js': 'src/context-menu/context-menu.js',

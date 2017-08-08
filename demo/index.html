@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="../dist/chromecast/chromecast.css">
     <link rel="stylesheet" href="../dist/context-menu/context-menu.css">
     <link rel="stylesheet" href="../dist/playlist/playlist.css">
+    <link rel="stylesheet" href="../dist/ads/ads.css">
 
     <style>
         #container {
@@ -103,6 +104,7 @@
 <script src="../dist/chromecast/chromecast.js"></script>
 <script src="../dist/context-menu/context-menu.js"></script>
 <script src="../dist/playlist/playlist.js"></script>
+<script src="../dist/ads/ads.js"></script>
 <script id="mejs-code">
 	var mediaElements = document.querySelectorAll('video, audio');
 
@@ -112,7 +114,11 @@
 		// To demonstrate the use of Chromecast with audio
 		if (mediaElements[i].tagName === 'AUDIO') {
 		    features.push('chromecast');
-        }
+        } else {
+			var cachebuster = Math.random() * 10000000000000000;
+            // var url = http://search.spotxchange.com/vast/2.0/85394?VPAID=JS&content_page_url=http://powerfulpresentations.com/streams/testme-vpaid-rm.html&cb=' + cachebuster + '&player_width=960&player_height=540
+            var url = 'http://rtr.innovid.com/r1.5554946ab01d97.36996823;cb=' + cachebuster
+	    }
 	    new MediaElementPlayer(mediaElements[i], {
 		    // This is needed to make Jump Forward to work correctly
             pluginPath: 'https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.3/',

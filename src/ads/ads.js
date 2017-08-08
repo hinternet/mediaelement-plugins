@@ -1,61 +1,17 @@
 'use strict';
 
-/**
- * Ads plugin.
- * Sponsored by Minoto Video; updated to support VPAID and VAST3.0
- */
+// import AdsPlayer from './player';
+import AdsParser from './parser';
 
 // Translations (English required)
 mejs.i18n.en['mejs.ad-skip'] = 'Skip ad';
 mejs.i18n.en['mejs.ad-skip-info'] = ['Skip in 1 second', 'Skip in %1 seconds'];
 
 Object.assign(mejs.MepDefaults, {
-	/**
-	 * URL(s) to a media file
-	 * @type {String[]}
-	 */
-	adsPrerollMediaUrl: [],
-
-	/**
-	 * URL(s) to clicking Ad
-	 * @type {String[]}
-	 */
-	adsPrerollAdUrl: [],
-
-	/**
-	 * Allow user to skip the pre-roll Ad
-	 * @type {Boolean}
-	 */
-	adsPrerollAdEnableSkip: false,
-
-	/**
-	 * If `adsPrerollAdEnableSkip` is `true`, allow skipping after the time specified has elasped
-	 * @type {Number}
-	 */
-	adsPrerollAdSkipSeconds: -1,
-
-	/**
-	 * Keep track of the index for the preroll ads to be able to show more than one preroll.
-	 * Used for VAST3.0
-	 * @type {Number}
-	 */
-	indexPreroll: 0
+	adsUrl: ''
 });
 
 Object.assign(MediaElementPlayer.prototype, {
-
-	// allows other plugins to all this one
-	adsLoaded: false,
-
-	// prevents playback in until async ad data is ready (e.g. VAST)
-	adsDataIsLoading: false,
-
-	// stores the main media URL when an ad is playing
-	adsCurrentMediaUrl: '',
-	adsCurrentMediaDuration: 0,
-
-	// true when the user clicks play for the first time, or if autoplay is set
-	adsPlayerHasStarted: false,
 
 	/**
 	 * Feature constructor.
@@ -65,324 +21,497 @@ Object.assign(MediaElementPlayer.prototype, {
 	 * @param {HTMLElement} controls
 	 * @param {HTMLElement} layers
 	 */
-	buildads (player, controls, layers)  {
-
-		const t = this;
-
-		if (t.adsLoaded) {
+	buildads (player, controls, layers) {
+		if (!player.options.adsUrl) {
 			return;
-		} else {
-			t.adsLoaded = true;
 		}
+
 
 		// add layer for ad links and skipping
 		player.adsLayer = document.createElement('div');
-		player.adsLayer.className = `${t.options.classPrefix}layer ${t.options.classPrefix}overlay ${t.options.classPrefix}ads`;
+		player.adsLayer.className = `${player.options.classPrefix}layer ${player.options.classPrefix}overlay ${player.options.classPrefix}ads`;
 		player.adsLayer.innerHTML = `<a href="#" target="_blank"></a>` +
-			`<div class="${t.options.classPrefix}ads-skip-block">` +
-			`<span class="${t.options.classPrefix}ads-skip-message"></span>` +
-			`<span class="${t.options.classPrefix}ads-skip-button">${mejs.i18n.t('mejs.ad-skip')}</span>` +
+			`<div class="${player.options.classPrefix}ads-skip-block">` +
+			`<span class="${player.options.classPrefix}ads-skip-message"></span>` +
+			`<span class="${player.options.classPrefix}ads-skip-button">${mejs.i18n.t('mejs.ad-skip')}</span>` +
 			`</div>`;
 		player.adsLayer.style.display = 'none';
 
-		layers.insertBefore(player.adsLayer, layers.querySelector(`.${t.options.classPrefix}overlay-play`));
+		layers.insertBefore(player.adsLayer, layers.querySelector(`.${player.options.classPrefix}overlay-play`));
 
-		player.adsLayer.querySelector('a').addEventListener('click', t.adsAdClick.bind(t));
-
-		player.adsSkipBlock = player.adsLayer.querySelector(`.${t.options.classPrefix}ads-skip-block`);
+		player.adsSkipBlock = player.adsLayer.querySelector(`.${player.options.classPrefix}ads-skip-block`);
 		player.adsSkipBlock.style.display = 'none';
-		player.adsSkipMessage = player.adsLayer.querySelector(`.${t.options.classPrefix}ads-skip-message`);
+		player.adsSkipMessage = player.adsLayer.querySelector(`.${player.options.classPrefix}ads-skip-message`);
 		player.adsSkipMessage.style.display = 'none';
-		player.adsSkipButton = player.adsLayer.querySelector(`.${t.options.classPrefix}ads-skip-button`);
-		player.adsSkipButton.addEventListener('click', t.adsSkipClick.bind(t));
+		player.adsSkipButton = player.adsLayer.querySelector(`.${player.options.classPrefix}ads-skip-button`);
+		//player.adsSkipButton.addEventListener('click', player._adsSkipClick.bind(player));
 
-		// create proxies (only needed for events we want to remove later)
-		t.adsMediaTryingToStartProxy = t.adsMediaTryingToStart.bind(t);
-		t.adsPrerollStartedProxy = t.adsPrerollStarted.bind(t);
-		t.adsPrerollMetaProxy = t.adsPrerollMeta.bind(t);
-		t.adsPrerollUpdateProxy = t.adsPrerollUpdate.bind(t);
-		t.adsPrerollVolumeProxy = t.adsPrerollVolume.bind(t);
-		t.adsPrerollEndedProxy = t.adsPrerollEnded.bind(t);
+		// parse Ads link to find
+		new AdsParser(player.options.adsUrl);
 
-		// If an iframe is the main source, hide it to give priority to video tag
-		t.media.addEventListener('rendererready', () => {
-			var iframe = t.media.querySelector('iframe');
-			if (iframe) {
-				iframe.style.display = 'none';
-			}
-		});
-		// check for start
-		t.media.addEventListener('play', t.adsMediaTryingToStartProxy);
-		t.media.addEventListener('playing', t.adsMediaTryingToStartProxy);
-		t.media.addEventListener('canplay', t.adsMediaTryingToStartProxy);
-		t.media.addEventListener('loadedmetadata', t.adsMediaTryingToStartProxy);
+		// create new player
+		// player.adsPlayer = new AdsPlayer(media, url, 'iframe');
 
-		if (t.options.indexPreroll < t.options.adsPrerollMediaUrl.length) {
-			t.adsStartPreroll();
-		}
+		player.setupEvents();
 	},
-
-	adsMediaTryingToStart ()  {
-
-		const t = this;
-
-		// make sure to pause until the ad data is loaded
-		if (t.adsDataIsLoading && !t.paused && t.options.indexPreroll < t.options.adsPrerollMediaUrl.length) {
-			t.pause();
-		}
-
-		t.adsPlayerHasStarted = true;
-	},
-
-	adsStartPreroll ()  {
-
-		const t = this;
-
-		t.media.addEventListener('loadedmetadata', t.adsPrerollMetaProxy);
-		t.media.addEventListener('playing', t.adsPrerollStartedProxy);
-		t.media.addEventListener('ended', t.adsPrerollEndedProxy);
-		t.media.addEventListener('timeupdate', t.adsPrerollUpdateProxy);
-		t.media.addEventListener('volumechange', t.adsPrerollVolumeProxy);
-
-		// change URLs to the preroll ad. Only save the video to be shown on first
-		// ad showing.
-		if (t.options.indexPreroll === 0) {
-			t.adsCurrentMediaUrl = t.media.originalNode.src;
-			t.adsCurrentMediaDuration = t.duration;
-		}
-
-		t.setSrc(t.options.adsPrerollMediaUrl[t.options.indexPreroll]);
-		t.load();
-
-		// turn off controls until the preroll is done
-		const controlElements = t.container.querySelector(`.${t.options.classPrefix}controls`).children;
-		for (let i = 0, total = controlElements.length; i < total; i++) {
-			const
-				target = controlElements[i],
-				button = target.querySelector('button')
-			;
-			if (button && (!mejs.Utils.hasClass(target, `${t.options.classPrefix}playpause-button`) &&
-				!mejs.Utils.hasClass(target, `${t.options.classPrefix}chromecast-button`))) {
-				button.disabled = true;
-				target.style.pointerEvents = 'none';
-			} else if (target.querySelector(`.${t.options.classPrefix}time-slider`)) {
-				target.querySelector(`.${t.options.classPrefix}time-slider`).style.pointerEvents = 'none';
-			}
-		}
-
-		// if autoplay was on, or if the user pressed play
-		// while the ad data was still loading, then start the ad right away
-		if (t.adsPlayerHasStarted) {
-			setTimeout(() => {
-				t.play();
-			}, 100);
-		}
-	},
-
-	adsPrerollMeta ()  {
-
-		const t = this;
-
-		let newDuration = 0;
-
-		// if duration has been set, show that
-		if (t.options.duration > 0) {
-			newDuration = t.options.duration;
-		} else if (!isNaN(t.adsCurrentMediaDuration)) {
-			newDuration = t.adsCurrentMediaDuration;
-		}
-
-		if (t.controls.querySelector(`.${t.options.classPrefix}duration`)) {
-			setTimeout(() => {
-				t.controls.querySelector(`.${t.options.classPrefix}duration`).innerHTML =
-					mejs.Utils.secondsToTimeCode(newDuration, t.options.alwaysShowHours,
-						t.options.showTimecodeFrameCount, t.options.framesPerSecond, t.options.secondsDecimalLength);
-			}, 250);
-		}
-
-		// send initialization events
-		const event = mejs.Utils.createEvent('mejsprerollinitialized', t.container);
-		t.container.dispatchEvent(event);
-	},
-
-	adsPrerollStarted ()  {
-		const t = this;
-
-		t.media.removeEventListener('playing', t.adsPrerollStartedProxy);
-
-		// enable clicking through
-		t.adsLayer.style.display = 'block';
-		if (t.options.adsPrerollAdUrl[t.options.indexPreroll]) {
-			t.adsLayer.querySelector('a').href = t.options.adsPrerollAdUrl[t.options.indexPreroll];
-		} else {
-			t.adsLayer.querySelector('a').href = '#';
-			t.adsLayer.querySelector('a').setAttribute('target', '');
-		}
-
-		// possibly allow the skip button to work
-		if (t.options.adsPrerollAdEnableSkip) {
-			t.adsSkipBlock.style.display = 'block';
-
-			if (t.options.adsPrerollAdSkipSeconds > 0) {
-				t.adsSkipMessage.innerHTML = mejs.i18n.t('mejs.ad-skip-info', t.options.adsPrerollAdSkipSeconds);
-				t.adsSkipMessage.style.display = 'block';
-				t.adsSkipButton.style.display = 'none';
-			} else {
-				t.adsSkipMessage.style.display = 'none';
-				t.adsSkipButton.style.display = 'block';
-			}
-		} else {
-			t.adsSkipBlock.style.display = 'none';
-		}
-
-		// send click events
-		const event = mejs.Utils.createEvent('mejsprerollstarted', t.container);
-		t.container.dispatchEvent(event);
-	},
-
-	adsPrerollUpdate ()  {
-		const t = this;
-
-		if (t.options.adsPrerollAdEnableSkip && t.options.adsPrerollAdSkipSeconds > 0) {
-			// update message
-			if (t.currentTime > t.options.adsPrerollAdSkipSeconds) {
-				t.adsSkipButton.style.display = 'block';
-				t.adsSkipMessage.style.display = 'none';
-			} else {
-				t.adsSkipMessage.innerHTML = mejs.i18n.t('mejs.ad-skip-info', Math.round(t.options.adsPrerollAdSkipSeconds - t.currentTime));
-			}
-
-		}
-
-		const event = mejs.Utils.createEvent('mejsprerolltimeupdate', t.container);
-		event.detail.duration = t.duration;
-		event.detail.currentTime = t.currentTime;
-		t.container.dispatchEvent(event);
-	},
-
-	adsPrerollVolume () {
-		const t = this;
-
-		const event = mejs.Utils.createEvent('mejsprerollvolumechanged', t.container);
-		t.container.dispatchEvent(event);
-
-	},
-
-	adsPrerollEnded ()  {
-		const t = this;
-
-		t.media.removeEventListener('ended', t.adsPrerollEndedProxy);
-
-		// wrap in timeout to make sure it truly has ended
-		setTimeout(() => {
-			t.options.indexPreroll++;
-			if (t.options.indexPreroll < t.options.adsPrerollMediaUrl.length) {
-				t.adsStartPreroll();
-			} else {
-				t.adRestoreMainMedia();
-			}
-
-			const event = mejs.Utils.createEvent('mejsprerollended', t.container);
-			t.container.dispatchEvent(event);
-		}, 0);
-	},
-
-	adRestoreMainMedia ()  {
-		const
-			t = this,
-			iframe = t.media.querySelector('iframe')
-		;
-
-		if (iframe) {
-			iframe.style.display = '';
-		}
-
-		t.setSrc(t.adsCurrentMediaUrl);
-		setTimeout(() => {
-			t.load();
-			t.play();
-		}, 10);
-
-		// turn on controls to restore original media
-		const controlElements = t.container.querySelector(`.${t.options.classPrefix}controls`).children;
-		for (let i = 0, total = controlElements.length; i < total; i++) {
-			const
-				target = controlElements[i],
-				button = target.querySelector('button')
-			;
-			if (button && !mejs.Utils.hasClass(target, `${t.options.classPrefix}playpause-button`)) {
-				target.style.pointerEvents = 'auto';
-				button.disabled = false;
-			} else if (target.querySelector(`.${t.options.classPrefix}time-slider`)) {
-				target.querySelector(`.${t.options.classPrefix}time-slider`).style.pointerEvents = 'auto';
-			}
-		}
-
-		if (t.adsSkipBlock) {
-			t.adsSkipBlock.remove();
-		}
-
-		t.adsLayer.style.display = 'none';
-
-		t.media.removeEventListener('ended', t.adsPrerollEndedProxy);
-		t.media.removeEventListener('loadedmetadata', t.adsPrerollMetaProxy);
-		t.media.removeEventListener('timeupdate', t.adsPrerollUpdateProxy);
-
-		const event = mejs.Utils.createEvent('mejsprerollmainstarted', t.container);
-		t.container.dispatchEvent(event);
-	},
-
-	adsAdClick ()  {
-		const t = this;
-
-		if (t.paused) {
-			t.play();
-		} else {
-			t.pause();
-		}
-
-		const event = mejs.Utils.createEvent('mejsprerolladsclicked', t.container);
-		t.container.dispatchEvent(event);
-	},
-
-	adsSkipClick (e)  {
-		const t = this;
-
-		t.media.removeEventListener('ended', t.adsPrerollEndedProxy);
-
-		let event = mejs.Utils.createEvent('mejsprerollskipclicked', t.container);
-		t.container.dispatchEvent(event);
-
-		event = mejs.Utils.createEvent('mejsprerollended', t.container);
-		t.container.dispatchEvent(event);
-
-		t.options.indexPreroll++;
-		if (t.options.indexPreroll < t.options.adsPrerollMediaUrl.length) {
-			t.adsStartPreroll();
-		} else {
-			t.adRestoreMainMedia();
-		}
+	// cleanads () {
+	//
+	// },
+	_adsSkipClick (e) {
+		// const t = this;
+		//
+		// t.media.removeEventListener('ended', t.adsPrerollEndedProxy);
+		//
+		// let event = mejs.Utils.createEvent('mejsprerollskipclicked', t.container);
+		// t.container.dispatchEvent(event);
+		//
+		// event = mejs.Utils.createEvent('mejsprerollended', t.container);
+		// t.container.dispatchEvent(event);
+		//
+		// t.options.indexPreroll++;
+		// if (t.options.indexPreroll < t.options.adsPrerollMediaUrl.length) {
+		// 	t.adsStartPreroll();
+		// } else {
+		// 	t.adRestoreMainMedia();
+		// }
 
 		e.preventDefault();
 		e.stopPropagation();
-	},
 
-	// tells calling function if ads have finished running
-	prerollAdsFinished ()  {
+
+	},
+	setupEvents () {
+
 		const t = this;
-		return t.options.indexPreroll === t.options.adsPrerollMediaUrl.length;
-	},
 
-	// fires off fake XHR requests
-	adsLoadUrl (url)  {
 		let
-			img = new Image(),
-			rnd = Math.round(Math.random() * 100000)
+			firstQuartExecuted = false,
+			secondQuartExecuted = false,
+			thirdQuartExecuted = false
 		;
 
-		img.src = `${url}${(~url.indexOf('?') ? '&' : '?')}random${rnd}=${rnd}`;
-		img.loaded = () => {
-			img = null;
-		};
+		// LOAD: preroll
+		t.container.addEventListener('mejsprerollinitialized', () => {
+			if (t.AdTags.length > 0) {
+
+				const adTag = t.AdTags[0];
+
+				if (adTag.trackingEvents.initialization) {
+					for (let i = 0, total = adTag.trackingEvents.initialization.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.initialization[i]);
+					}
+				}
+			}
+		});
+
+
+		// START: preroll
+		t.container.addEventListener('mejsprerollstarted', () => {
+
+			if (t.AdTags.length > 0) {
+
+				const adTag = t.AdTags[0];
+
+				// always fire this event
+				if (adTag.trackingEvents.start) {
+					for (let i = 0, total = adTag.trackingEvents.start.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.start[i]);
+					}
+				}
+
+				// only do impressions once
+				if (!adTag.shown && adTag.impressions.length > 0) {
+					for (let i = 0, total = adTag.impressions.length; i < total; i++) {
+						t.adsLoadUrl(adTag.impressions[i]);
+					}
+				}
+
+				adTag.shown = true;
+			}
+		});
+
+		// VOLUMECHANGE: preroll
+		t.container.addEventListener('mejsprerollvolumechanged', () => {
+
+			if (t.AdTags.length > 0 && t.options.indexPreroll < t.AdTags.length) {
+				const adTag = t.AdTags[t.options.indexPreroll];
+
+
+				if (adTag.trackingEvents.mute && !t.media.volume) {
+					for (let i = 0, total = adTag.trackingEvents.mute.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.mute[i]);
+					}
+				}
+
+				if (adTag.trackingEvents.unmute && t.media.volume) {
+					for (let i = 0, total = adTag.trackingEvents.unmute.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.unmute[i]);
+					}
+				}
+			}
+		});
+
+		// UPDATE: preroll
+		t.container.addEventListener('mejsprerolltimeupdate', (e) => {
+
+			if (t.AdTags.length > 0 && t.options.indexPreroll < t.AdTags.length) {
+				const
+					duration = e.detail.duration,
+					current = e.detail.currentTime,
+					percentage = Math.min(1, Math.max(0, current / duration)) * 100,
+					adTag = t.AdTags[t.options.indexPreroll],
+					isFirsQuart = percentage >= 25 && percentage < 50,
+					isMidPoint = percentage >= 50 && percentage < 75,
+					isThirdQuart = percentage >= 75 && percentage < 100
+				;
+
+				// Check which track is going to be fired
+				if (adTag.trackingEvents.firstQuartile && !firstQuartExecuted && isFirsQuart) {
+					for (let i = 0, total = adTag.trackingEvents.firstQuartile.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.firstQuartile[i]);
+					}
+					firstQuartExecuted = true;
+				} else if (adTag.trackingEvents.midpoint && !secondQuartExecuted && isMidPoint) {
+					for (let i = 0, total = adTag.trackingEvents.midpoint.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.midpoint[i]);
+					}
+					secondQuartExecuted = true;
+				} else if (adTag.trackingEvents.thirdQuartile && !thirdQuartExecuted && isThirdQuart) {
+					for (let i = 0, total = adTag.trackingEvents.thirdQuartile.length; i < total; i++) {
+						t.adsLoadUrl(adTag.trackingEvents.thirdQuartile[i]);
+					}
+					thirdQuartExecuted = true;
+				}
+			}
+		});
+
+		// END: preroll
+		t.container.addEventListener('mejsprerollended', () => {
+
+			const adTag = t.AdTags[t.options.indexPreroll];
+
+			if (t.AdTags.length > 0 && t.options.indexPreroll < t.AdTags.length && adTag.trackingEvents.complete) {
+				for (let i = 0, total = adTag.trackingEvents.complete.length; i < total; i++) {
+					t.adsLoadUrl(adTag.trackingEvents.complete[i]);
+				}
+			}
+
+			firstQuartExecuted = false;
+			secondQuartExecuted = false;
+			thirdQuartExecuted = false;
+		});
+
+		// ADCLICKED: preroll
+		t.container.addEventListener('mejsprerolladsclicked', () => {
+			const adTag = t.AdTags[t.options.indexPreroll];
+
+			if (t.AdTags.length > 0 && t.options.indexPreroll < t.AdTags.length && adTag.clickThrough && adTag.clickTracking) {
+				t.adsLoadUrl(adTag.clickTracking);
+			}
+		});
+
+		// ADSKIPPED: preroll
+		t.container.addEventListener('mejsprerollskipclicked', () => {
+
+			const adTag = t.AdTags[t.options.indexPreroll];
+
+			if (t.AdTags.length > 0 && t.options.indexPreroll < t.AdTags.length && adTag.trackingEvents.skip) {
+				for (let i = 0, total = adTag.trackingEvents.skip.length; i < total; i++) {
+					t.adsLoadUrl(adTag.trackingEvents.skip[i]);
+				}
+			}
+		});
+	},
+
+	/**
+	 *
+	 * @param {String} url
+	 */
+	setAdTagUrl (url) {
+
+		const t = this;
+
+		// set and reset
+		t.options.AdTagUrl = url;
+		t.options.indexPreroll = 0;
+		t.AdTagIsLoaded = false;
+		t.AdTags = [];
+	},
+
+	/**
+	 *
+	 */
+	loadAdTagInfo () {
+		const t = this;
+
+		// set this to stop playback
+		t.adsDataIsLoading = true;
+		t.AdTagIsLoading = true;
+
+		// try straight load first
+		t.loadAdTagInfoDirect();
+	},
+
+	/**
+	 *
+	 */
+	loadAdTagInfoDirect () {
+		const t = this;
+
+		mejs.Utils.ajax(t.options.AdTagUrl, 'xml', (data) => {
+			if (t.options.AdsType === 'vpaid') {
+				t.vpaidParseVpaidData(data);
+			} else {
+				t.ParseData(data);
+			}
+		}, (err) => {
+			console.error('3:direct:error', err);
+
+			// fallback to Yahoo proxy
+			t.loadAdTagInfoProxy();
+		});
+	},
+
+	/**
+	 *
+	 */
+	loadAdTagInfoProxy () {
+		const
+			t = this,
+			protocol = location.protocol,
+			query = `select * from xml where url="${encodeURI(t.options.AdTagUrl)}"`,
+			yahooUrl = `http${(/^https/.test(protocol) ? 's' : '')}://query.yahooapis.com/v1/public/yql?format=xml&q=${query}`
+		;
+
+		mejs.Utils.ajax(yahooUrl, 'xml', (data) => {
+			if (t.options.AdsType === 'vpaid') {
+				t.vpaidParseVpaidData(data);
+			} else {
+				t.ParseData(data);
+			}
+		}, (err) => {
+			console.error(':proxy:yahoo:error', err);
+		});
+	},
+
+	/**
+	 * Parse a  XML source and build adTags entities.
+	 *
+	 * This is compliant with VPAID 3.0
+	 * @param {String} data
+	 */
+	parse (data) {
+
+		const
+			t = this,
+			ads = data.getElementsByTagName('Ad')
+		;
+
+		if (!ads.length) {
+			return;
+		}
+
+		// clear out data
+		t.AdTags = [];
+		t.options.indexPreroll = 0;
+
+		for (let i = 0, total = ads.length; i < total; i++) {
+			const
+				adNode = ads[i],
+				title = adNode.getElementsByTagName('AdTitle').length ?
+					adNode.getElementsByTagName('AdTitle')[0].textContent.trim() : '',
+				description = adNode.getElementsByTagName('Description').length ?
+					adNode.getElementsByTagName('Description')[0].textContent.trim() : '',
+				clickLink = adNode.getElementsByTagName('ClickThrough').length ?
+					adNode.getElementsByTagName('ClickThrough')[0].textContent.trim() : '',
+				clickTrack = adNode.getElementsByTagName('ClickTracking').length ?
+					adNode.getElementsByTagName('ClickTracking')[0].textContent.trim() : '',
+				adTag = {
+					id: adNode.getAttribute('id'),
+					title: title,
+					description: description,
+					impressions: [],
+					clickThrough: clickLink,
+					clickTracking: clickTrack,
+					mediaFiles: [],
+					trackingEvents: {},
+					// internal tracking if it's been used
+					shown: false
+				},
+				impressions = adNode.getElementsByTagName('Impression'),
+				mediaFiles = adNode.getElementsByTagName('MediaFile'),
+				trackFiles = adNode.getElementsByTagName('Tracking')
+			;
+
+			t.AdTags.push(adTag);
+
+			for (let j = 0, impressionsTotal = impressions.length; j < impressionsTotal; j++) {
+				adTag.impressions.push(impressions[j].textContent.trim());
+			}
+
+			for (let j = 0, tracksTotal = trackFiles.length; j < tracksTotal; j++) {
+				const trackingEvent = trackFiles[j], event = trackingEvent.getAttribute('event');
+
+				if (adTag.trackingEvents[event] === undefined) {
+					adTag.trackingEvents[event] = [];
+				}
+				adTag.trackingEvents[event].push(trackingEvent.textContent.trim());
+			}
+
+			for (let j = 0, mediaFilesTotal = mediaFiles.length; j < mediaFilesTotal; j++) {
+				const
+					mediaFile = mediaFiles[j],
+					type = mediaFile.getAttribute('type')
+				;
+
+				if (t.media.canPlayType(type) !== '' || /(no|false)/i.test(t.media.canPlayType(type))) {
+
+					// Execute JS files if found
+					if (mediaFile.getAttribute('type') === 'application/javascript') {
+						const
+							script = document.createElement('script'),
+							firstScriptTag = document.getElementsByTagName('script')[0]
+						;
+
+						script.src = mediaFile.textContent.trim();
+						firstScriptTag.parentNode.insertBefore(script, firstScriptTag);
+
+					}
+					// Avoid Flash
+					else if (mediaFile.getAttribute('delivery') !== 'application/x-shockwave-flash') {
+						adTag.mediaFiles.push({
+							id: mediaFile.getAttribute('id'),
+							delivery: mediaFile.getAttribute('delivery'),
+							type: mediaFile.getAttribute('type'),
+							bitrate: mediaFile.getAttribute('bitrate'),
+							width: mediaFile.getAttribute('width'),
+							height: mediaFile.getAttribute('height'),
+							url: mediaFile.textContent.trim()
+						});
+					}
+				}
+			}
+		}
+
+		// DONE
+		t.Loaded();
+	},
+
+	/**
+	 * Parse a VPAID XML source and build adTags entities.
+	 *
+	 * This is compliant with VPAID 2.0
+	 * @param {String} data
+	 */
+	vpaidParseVpaidData (data) {
+
+		const
+			t = this,
+			ads = data.getElementsByTagName('AdParameters')
+		;
+
+		// clear out data
+		t.vpaidAdTags = [];
+		t.options.indexPreroll = 0;
+
+		if (typeof ads[0] === 'undefined') {
+			return;
+		}
+
+		const
+			adData = JSON.parse(ads[0].textContent.trim()),
+			duration = data.getElementsByTagName('Duration'),
+			adTag = {
+				id: adData.ad_id.trim(),
+				title: adData.title.trim(),
+				clickThrough: adData.page_url,
+				impressions: [],
+				mediaFiles: [],
+				trackingEvents: {},
+				// internal tracking if it's been used
+				shown: false
+			}
+		;
+
+		if (typeof adData.media.tracking.beacon !== 'undefined') {
+
+			const trackingPoints = ['initialization', 'start', 'firstQuartile', 'midpoint', 'thirdQuartile', 'complete'];
+
+			for (let i = 0, total = adData.media.tracking.beacon.length; i < total; i++) {
+				const trackingEvent = adData.media.tracking.beacon[i];
+
+				if (~trackingPoints.indexOf(trackingEvent.type)) {
+					if (adTag.trackingEvents[trackingEvent.type] === undefined) {
+						adTag.trackingEvents[trackingEvent.type] = [];
+					}
+					adTag.trackingEvents[trackingEvent.type].push(trackingEvent.beacon_url.trim());
+				} else if (trackingEvent.type === 'impression') {
+					adTag.impressions.push(trackingEvent.beacon_url.trim());
+				}
+			}
+		}
+
+		for (const property in adData.media.video) {
+			if (adData.media.video.hasOwnProperty(property)) {
+				const
+					mediaFile = adData.media.video[property],
+					type = mediaFile.mime_type.trim()
+				;
+
+				if (t.media.canPlayType(type) !== '' || /(no|false)/i.test(t.media.canPlayType(type))) {
+
+					adTag.mediaFiles.push({
+						id: mediaFile.media_id,
+						format: mediaFile.format,
+						type: type,
+						transcoding: mediaFile.transcoding,
+						width: mediaFile.width,
+						height: mediaFile.height,
+						duration: duration,
+						url: mediaFile.media_url
+					});
+				}
+			}
+		}
+
+		t.AdTags.push(adTag);
+
+		// DONE
+		t.Loaded();
+	},
+
+	/**
+	 *
+	 */
+	Loaded () {
+		const t = this;
+
+		t.AdTagIsLoaded = true;
+		t.AdTagIsLoading = false;
+		t.adsDataIsLoading = false;
+		t.StartPreroll();
+	},
+
+	/**
+	 *
+	 */
+	StartPreroll () {
+		const t = this;
+
+		// if we have a media URL, then send it up to the ads plugin as a preroll
+		// load up the  ads to be played before the selected media.
+		// Note: multiple preroll ads are supported.
+		let i = 0;
+		while (i < t.AdTags.length) {
+			if (typeof t.AdTags[i].mediaFiles !== 'undefined' && t.AdTags[i].mediaFiles.length) {
+				t.options.adsPrerollMediaUrl[i] = t.AdTags[i].mediaFiles[0].url;
+			}
+			if (typeof t.AdTags[i].clickThrough !== 'undefined') {
+				t.options.adsPrerollAdUrl[i] = t.AdTags[i].clickThrough;
+			}
+			i++;
+		}
+		t.adsStartPreroll();
+
 	}
 });
