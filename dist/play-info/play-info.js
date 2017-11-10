@@ -35,8 +35,8 @@ Object.assign(MediaElementPlayer.prototype, {
         player.playInfoLayer.innerHTML = '<ul class="' + player.options.classPrefix + 'play-info-container"></ul>';
         layers.insertBefore(player.playInfoLayer, layers.firstChild);
 
-        for (var _i = 0, total = player.listItems.length; _i < total; _i++) {
-            player.playInfoLayer.querySelector('ul').innerHTML += player.listItems[_i];
+        for (var i = 0, total = player.listItems.length; i < total; i++) {
+            player.playInfoLayer.querySelector('ul').innerHTML += player.listItems[i];
         }
 
         if (player.isVideo) {
@@ -52,8 +52,8 @@ Object.assign(MediaElementPlayer.prototype, {
 
             if (items.length <= 10) {
                 var height = 0;
-                for (var _i2 = 0, _total = items.length; _i2 < _total; _i2++) {
-                    height += items[_i2].offsetHeight;
+                for (var _i = 0, _total = items.length; _i < _total; _i++) {
+                    height += items[_i].offsetHeight;
                 }
                 player.container.style.height = height + 'px';
             }
@@ -70,8 +70,8 @@ Object.assign(MediaElementPlayer.prototype, {
         if (!t.options.playInfo) {
             var children = t.mediaFiles || t.media.originalNode.children;
 
-            for (var _i3 = 0; _i3 < 1; _i3++) {
-                var childNode = children[_i3];
+            for (var i = 0; i < 1; i++) {
+                var childNode = children[i];
 
                 if (childNode.tagName.toLowerCase() === 'source') {
                     (function () {
@@ -93,12 +93,12 @@ Object.assign(MediaElementPlayer.prototype, {
 
         var element = t.playInfo,
             item = document.createElement('li'),
-            id = t.id + '_play-info_' + i,
+            id = t.id + '_play-info_0',
             thumbnail = element['data-play-info-thumbnail'] ? '<div class="' + t.options.classPrefix + 'play-info-item-thumbnail"><img tabindex="-1" src="' + element['data-play-info-thumbnail'] + '"></div>' : '',
             description = element['data-play-info-description'] ? '<div class="' + t.options.classPrefix + 'play-info-item-description">' + element['data-play-info-description'] + '</div>' : '';
         item.tabIndex = 0;
         item.className = t.options.classPrefix + 'play-info-selector-list-item ' + t.options.classPrefix + 'play-info-selected';
-        item.innerHTML = '<div class="' + t.options.classPrefix + 'play-info-item-inner">' + ('' + thumbnail) + ('<div class="' + t.options.classPrefix + 'play-info-item-content">') + ('<div><input type="radio" class="' + t.options.classPrefix + 'play-info-selector-input" ') + ('name="' + t.id + '_playlist" id="' + id + '" data-play-info-index="' + i + '" value="' + element.src + '" disabled>') + ('<label class="' + t.options.classPrefix + 'play-info-selector-label" ') + ('for="' + id + '">' + (i === 0 ? '<span>\u25B6</span> ' : '') + (element.title || i) + '</label></div>' + description + '</div></div>');
+        item.innerHTML = '<div class="' + t.options.classPrefix + 'play-info-item-inner">' + ('' + thumbnail) + ('<div class="' + t.options.classPrefix + 'play-info-item-content">') + ('<div><input type="radio" class="' + t.options.classPrefix + 'play-info-selector-input" ') + ('name="' + t.id + '_playlist" id="' + id + '" data-play-info-index="' + 0 + '" value="' + element.src + '" disabled>') + ('<label class="' + t.options.classPrefix + 'play-info-selector-label" ') + ('for="' + id + '">' + element.title + '</label></div>' + description + '</div></div>');
 
         t.listItems.push(item.outerHTML);
     }

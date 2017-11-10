@@ -27,7 +27,6 @@ Object.assign(MediaElementPlayer.prototype, {
      * @param {MediaElementPlayer} player
      * @param {HTMLElement} controls
      * @param {HTMLElement} layers
-     * @param {HTMLElement} media
      */
     buildplayinfo (player, controls, layers) {
 
@@ -107,7 +106,7 @@ Object.assign(MediaElementPlayer.prototype, {
         const
             element = t.playInfo,
             item = document.createElement('li'),
-            id = `${t.id}_play-info_${i}`,
+            id = `${t.id}_play-info_0`,
             thumbnail = element['data-play-info-thumbnail'] ? `<div class="${t.options.classPrefix}play-info-item-thumbnail"><img tabindex="-1" src="${element['data-play-info-thumbnail']}"></div>` : '',
             description = element['data-play-info-description'] ? `<div class="${t.options.classPrefix}play-info-item-description">${element['data-play-info-description']}</div>` : ''
         ;
@@ -117,9 +116,9 @@ Object.assign(MediaElementPlayer.prototype, {
             `${thumbnail}` +
             `<div class="${t.options.classPrefix}play-info-item-content">` +
             `<div><input type="radio" class="${t.options.classPrefix}play-info-selector-input" ` +
-            `name="${t.id}_playlist" id="${id}" data-play-info-index="${i}" value="${element.src}" disabled>` +
+            `name="${t.id}_playlist" id="${id}" data-play-info-index="${0}" value="${element.src}" disabled>` +
             `<label class="${t.options.classPrefix}play-info-selector-label" ` +
-            `for="${id}">${(i === 0 ? '<span>\u25B6</span> ' : '')}${(element.title || i)}</label></div>${description}</div></div>`;
+            `for="${id}">${element.title}</label></div>${description}</div></div>`;
 
         t.listItems.push(item.outerHTML);
     }
