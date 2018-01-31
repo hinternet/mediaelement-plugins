@@ -90,15 +90,15 @@ Object.assign(MediaElementPlayer.prototype, {
         }
 
         t.listItems = [];
-
         var element = t.playInfo,
             item = document.createElement('li'),
             id = t.id + '_play-info_0',
             thumbnail = element['data-play-info-thumbnail'] ? '<div class="' + t.options.classPrefix + 'play-info-item-thumbnail"><img tabindex="-1" src="' + element['data-play-info-thumbnail'] + '"></div>' : '',
-            description = element['data-play-info-description'] ? '<div class="' + t.options.classPrefix + 'play-info-item-description">' + element['data-play-info-description'] + '</div>' : '';
+            description = element['data-play-info-description-link'] ? '<a href="' + element['data-play-info-description-link'] + '"><div class="' + t.options.classPrefix + 'play-info-item-description-linked">' + element['data-play-info-description'] + '</div></a>' : element['data-play-info-description'] ? '<div class="' + t.options.classPrefix + 'play-info-item-description">' + element['data-play-info-description'] + '</div>' : '',
+            title = element['title-link'] ? '<a href="' + element['title-link'] + '">' + element.title + '</a>' : element.title;
         item.tabIndex = 0;
         item.className = t.options.classPrefix + 'play-info-selector-list-item ' + t.options.classPrefix + 'play-info-selected';
-        item.innerHTML = '<div class="' + t.options.classPrefix + 'play-info-item-inner">' + ('' + thumbnail) + ('<div class="' + t.options.classPrefix + 'play-info-item-content">') + ('<div><input type="radio" class="' + t.options.classPrefix + 'play-info-selector-input" ') + ('name="' + t.id + '_playlist" id="' + id + '" data-play-info-index="' + 0 + '" value="' + element.src + '" disabled>') + ('<label class="' + t.options.classPrefix + 'play-info-selector-label" ') + ('for="' + id + '">' + element.title + '</label></div>' + description + '</div></div>');
+        item.innerHTML = '<div class="' + t.options.classPrefix + 'play-info-item-inner">' + ('' + thumbnail) + ('<div class="' + t.options.classPrefix + 'play-info-item-content">') + ('<div><input type="radio" class="' + t.options.classPrefix + 'play-info-selector-input" ') + ('name="' + t.id + '_playlist" id="' + id + '" data-play-info-index="' + 0 + '" value="' + element.src + '" disabled>') + ('<label class="' + t.options.classPrefix + 'play-info-selector-label" ') + ('for="' + id + '">' + title + '</label></div>' + description + '</div></div>');
 
         t.listItems.push(item.outerHTML);
     }
